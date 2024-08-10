@@ -1,9 +1,8 @@
 import psycopg2 
 from datetime import datetime
-con = psycopg2.connect(host='127.0.0.1',database='postgres',user='postgres',password='Alterego@2',port = 5432)
+
+con = psycopg2.connect(host='pg-308e5ec7-bus-ticket-booking-system.k.aivencloud.com',database='defaultdb',user='avnadmin',password='AVNS_98y0KvjPTI9Zw5MZieP',port = 21199)
 cur = con.cursor()
-
-
 
 class Booking:
 
@@ -16,33 +15,37 @@ class Booking:
         price_query = """select "SeatPrice" from public."Seat" where "BusId" = %s and "SeatId" = %s;"""
         search_query = """select "BusId","SeatId" from public."Seat";"""
         i=0
-        n=int(input("Enter number of Seat to Book:"))
-        cart = dict()
-        while i<n:
-            cur.execute("""select "BusId","SeatId" from public."Booked";""")
-            BusId = str(input("Enter the bus Id:"))
-            SeatId = str(input("Enter the Seat Id:"))
-            Booked_Seats = cur.fetchall()
-            if (BusId,SeatId) not in Booked_Seats:
-                cur.execute(search_query)
-                Valid_seats = cur.fetchall()
-                if (BusId,SeatId) in Valid_seats:
-                    if self.Confirm_check(choice=str(input("Enter Y to confirm:"))):
-                        cur.execute(insert_query,(BusId,SeatId,logged_in_customer_id))
-                        con.commit()
-                        cur.execute(price_query,(BusId,SeatId))
-                        price = cur.fetchone()[0]
-                        price = price - price * ( Discount.discount_rate(BusId,SeatId) / 100 )
-                        BookingHistory.Insert_Rows_Into_Booking_History(BusId,SeatId,price,Discount.discount_rate(BusId,SeatId))
-                        cart[i] = [BusId,SeatId,price,Discount.discount_rate(BusId,SeatId)]
-                        i=i+1
+        try:
+           n=int(input("Enter number of Seat to Book:"))
+        except ValueError:
+            print("Enter only interger")
+        else:
+            cart = dict()
+            while i<n:
+                cur.execute("""select "BusId","SeatId" from public."Booked";""")
+                BusId = str(input("Enter the bus Id:"))
+                SeatId = str(input("Enter the Seat Id:"))
+                Booked_Seats = cur.fetchall()
+                if (BusId,SeatId) not in Booked_Seats:
+                    cur.execute(search_query)
+                    Valid_seats = cur.fetchall()
+                    if (BusId,SeatId) in Valid_seats:
+                        if self.Confirm_check(choice=str(input("Enter Y to confirm:"))):
+                            cur.execute(insert_query,(BusId,SeatId,logged_in_customer_id))
+                            con.commit()
+                            cur.execute(price_query,(BusId,SeatId))
+                            price = cur.fetchone()[0]
+                            price = price - price * ( Discount.discount_rate(BusId,SeatId) / 100 )
+                            BookingHistory.Insert_Rows_Into_Booking_History(BusId,SeatId,price,Discount.discount_rate(BusId,SeatId))
+                            cart[i] = [BusId,SeatId,price,Discount.discount_rate(BusId,SeatId)]
+                            i=i+1
+                        else:
+                            print("You cancelled the booking")
                     else:
-                        print("You cancelled the booking")
+                        print("You Enter Wrong Id")
                 else:
-                    print("You Enter Wrong Id")
-            else:
-                print("The Seat is already Booked")
-        Display.display_bill(cart)
+                    print("The Seat is already Booked")
+            Display.display_bill(cart)
 
 class BookingHistory:
 
@@ -75,15 +78,19 @@ class Customer:
     def authorize_customer(self):
        search_query = """ select "CustomerName" from public."Customer" where "CustomerEmail" = %s and "LoginPassword" = %s;  """
        customer_id_query = """select "CustomerId" from public."Customer" where "CustomerEmail" = %s and "LoginPassword" = %s;"""
+       extract_customer_list_query = """ select "CustomerEmail","LoginPassword" from public."Customer";  """
+       cur.execute(extract_customer_list_query)
+       customer_list = cur.fetchall()
        customer_email = str(input("Enter your Email:"))
        customer_login_password = str(input("Enter your login Password :"))
-       cur.execute(customer_id_query,(customer_email,customer_login_password))
-       global logged_in_customer_id
-       logged_in_customer_id = cur.fetchone()[0]
-       cur.execute(search_query,(customer_email,customer_login_password))
-       customer_name = cur.fetchone()[0]
-       return customer_name
-    
+       if (customer_email,customer_login_password) in customer_list:
+           cur.execute(customer_id_query,(customer_email,customer_login_password))
+           global logged_in_customer_id
+           logged_in_customer_id = cur.fetchone()[0]
+           cur.execute(search_query,(customer_email,customer_login_password))
+           customer_name = cur.fetchone()[0]
+           return customer_name 
+       
     @classmethod
     def create_new_cutomer(self):
         create_customer_query = """ insert into public."Customer"("CustomerName","CustomerMobileNo","CustomerEmail","LoginPassword","DateJoined") values(%s,%s,%s,%s,%s) """
@@ -123,20 +130,35 @@ class Customer:
             con.commit()
             print("Updated Successfully!!")
         elif choice == 4:
+            get_old_password = """ select "LoginPassword" from public."Customer" where "CustomerId" = %s; """
             update_login_password_query = """update public."Customer" set "LoginPassword" = %s where "CustomerId" = %s; """
-            new_login_password = str(input("Enter new Login Password  to update:"))
-            cur.execute(update_login_password_query,(new_login_password,logged_in_customer_id))
-            con.commit()
-            print("Updated Successfully!!")
+            cur.execute(get_old_password,(logged_in_customer_id,))
+            old_login_password = cur.fetchone()[0]
+            user_enterd_old_login_password = str(input("Enter Old Login Password  to Verify:"))
+            if old_login_password == user_enterd_old_login_password:
+                new_login_password = str(input("Enter new Login Password  to update:"))
+                cur.execute(update_login_password_query,(new_login_password,logged_in_customer_id))
+                con.commit()
+                print("Updated Successfully!!")
+            else:
+                print("You Entered the Wrong Password")
         else:
             print("Enter a valid Option")
 
+    @classmethod
+    def customer_booking_history(self):
+        query_to_get_booking_history_of_customer = """select "Bus"."BusName","s"."SeatType","s"."SeatPlace","b"."Price","b"."DiscountRate","b"."DateTime" from   
+                                                     public."BookingRecords" "b" left join public."Bus"  on "Bus"."BusId" = "b"."BusId" left join public."Seat" "s"
+                                                    on "b"."SeatId" = "s"."SeatId" and "b"."BusId" = "s"."BusId"  where "b"."CustomerId"=%s;"""
+        cur.execute(query_to_get_booking_history_of_customer,(logged_in_customer_id,))
+        booking_history = cur.fetchall()
+        return booking_history
 
 
 class Display:
 
     @classmethod
-    def display_total_seats(self):
+    def display_available_seats(self):
         display_bus_query = """select * from public."Bus";"""
         cur.execute(display_bus_query)
         print("BusID\tBusName\tBusType\tBusSeatCount")
@@ -147,7 +169,7 @@ class Display:
         print("-------------------------------------")
 
         display_bus_id = str(input("Enter the Bus Id to view:"))
-        display_seats_query = """select * from public."Seat" where "BusId" = %s;"""
+        display_seats_query = """select * from public."Seat" where "BusId" = %s and "SeatId" not in (select "SeatId" from public."Booked") ;"""
         cur.execute(display_seats_query, (display_bus_id,))
         total_seats = cur.fetchall()
         print("\nSeatId\tBusID\tSeatType\t\tSeatPrice\tSeatPlace")
@@ -160,40 +182,48 @@ class Display:
     def display_booked_seats(self):
         cur.execute("""select "BusId","SeatId" from public."Booked";""")
         booked_seats = cur.fetchall()
+        print("-------------------------------------------")
+        print("|               BOOKED SEATS              |")
+        print("-------------------------------------------")
         if len(booked_seats) == 0:
             print("No Seats are Booked")
         else:
-            cur.execute("""select "BusId","SeatId" from public."Booked";""")
-            print("BusId\tSeatId")
-            print("--------------")
+            cur.execute("""select "b"."BusName","Booked"."SeatId" from public."Booked" left join public."Bus" "b" on "b"."BusId" = "Booked"."BusId";""")       
+            print("\tBusName\tSeatId")
+            print("|---------------------|")
             booked_seats = cur.fetchall()
             for i in booked_seats:
-                print(f"{i[0]}\t{i[1]}")
-            print("--------------")
+                print(f"\t{i[0]} \t{i[1]} ")
+            print("|---------------------|")
 
     @classmethod
     def display_discount_details(self):
-        query = """ select * from public."Discount"; """
-        print("BusId\tSeatType\tDiscountRate")
-        print("----------------------------------")
+        query = """ select "b"."BusName","d"."SeatType","d"."DiscountRate" from public."Discount" "d" left join public."Bus" "b" on "b"."BusId" = "d"."BusId" ; """
+        print("-------------------------------------------")
+        print("|            DISCOUNT OFFERS              |")
+        print("-------------------------------------------")
+        print("BusName\t SeatType\tDiscountRate")
+        print("-------------------------------------")
         cur.execute(query)
         discount_details  = cur.fetchall()
         for i in discount_details:
-            print(f"{i[0]}\t{i[1]}||\t{i[2]}")
-        print("----------------------------------")
+            print(f" {i[0]}\t {i[1]}||\t{i[2]}")
+        print("-------------------------------------")
 
     @classmethod
     def display_bill(self,cart):
         total=0
-        print("\t\t******Bill******")
+        print("--------------------------------------------------")
+        print("|                      BILL                      |")
+        print("--------------------------------------------------")
         print("S.No\tBusId\tSeatId\tDiscountRate\tFinal Price")
-        print("---------------------------------------------------")
+        print("--------------------------------------------------")
 
         for i in cart:
             print(f"{i+1}\t{cart[i][0]}\t{cart[i][1]}\t{cart[i][3]}\t\t{cart[i][2]}")
             total  = total + cart[i][2]
         print("---------------------------------------------------")
-        print("Total Amount to pay :-\t\t\t",total)
+        print(f"|Total Amount to pay :-\t\t\t{total}|")
         print("---------------------------------------------------")
 
     @classmethod
@@ -205,33 +235,38 @@ class Display:
             print("1.Create a New Account")
             print("2.Login")
             print("3.Exit")
-            choice = int(input("Enter your option:"))
-            if choice == 1:
-                Customer.create_new_cutomer()
-                print("=================================================")
-                print("Account Created Successfully!!\nNow you can login")
-                print("=================================================")
-            elif choice == 2:
-                customer_name = Customer.authorize_customer()
-                if customer_name:
-                    print("===========================================")
-                    print(f"Welcome {customer_name}!!")
-                    print(f"You Successfully Login as {customer_name}")
-                    print("===========================================")
-                    Display.display_user_menu()
+            try:
+                choice = int(input("Enter your option:"))
+            except ValueError:
+                print("===================")
+                print("Enter integer only")
+                print("===================")
+            else:
+                if choice == 1:
+                    Customer.create_new_cutomer()
+                    print("=================================================")
+                    print("Account Created Successfully!!\nNow you can login")
+                    print("=================================================")
+                elif choice == 2:
+                    customer_name = Customer.authorize_customer()
+                    if customer_name:
+                        print("===========================================")
+                        print(f"Welcome {customer_name}!!")
+                        print(f"You Successfully Logged In")
+                        print("===========================================")
+                        Display.display_user_menu()
+                        break
+                    else:
+                        print("========================================")
+                        print("You Enter Wrong Details\nPlease Retry")
+                        print("========================================")
+                elif choice == 3:
+                    print("===========================")
+                    print("Thank You!!! Visit Again!!!")
+                    print("===========================")
                     break
                 else:
-                    print("========================================")
-                    print("You Enter Wrong Details\nPlease Retry")
-                    print("========================================")
-
-            elif choice == 3:
-                print("===========================")
-                print("Thank You!!! Visit Again!!!")
-                print("===========================")
-                break
-            else:
-                print("Enter a Valid Choice.")
+                    print("Enter a Valid Choice.")
 
     @classmethod
     def display_user_menu(self):
@@ -242,65 +277,110 @@ class Display:
             print("1.To view Your Details")
             print("2.To Update Your Details")
             print("3.Booking Section")
-            print("4.Logout")
-            choice = int(input("Enter your choice:"))
-            if choice == 1:
-                customer_details = Customer.customers_details()
-                print("--------------------------------------")
-                print("|            YOUR DETAILS            |")
-                print("--------------------------------------")
-                print(f"Name           :{customer_details[0]}")
-                print(f"MobileNo       :{customer_details[1]}")
-                print(f"Email          :{customer_details[2]}")
-                print("--------------------------------------")
-            elif choice == 2:
-                print("-----------------------------------")
-                print("|        UPDATE SECTION           |")
-                print("-----------------------------------")
-                print("1.Update Name")
-                print("2.Update Mobile No")
-                print("3.Update Email")
-                print("4.Update LoginPassword")
-                print("5.Go Back")                  
-                choice = int(input("Enter your choice:"))
-                if choice == 5:
-                    Display.display_user_menu()
-                else:
-                    Customer.update_customer_details(choice)
-            elif choice == 3:
-                Display.display_booking_section()
-            elif choice == 4:
-                print("===========================")
-                print("Thank You!!! Visit Again!!!")
-                print("===========================")
-                break
+            print("4.Booking History")
+            print("5.Logout")
+            try:
+                choice = int(input("Enter your option:"))
+            except ValueError:
+                print("===================")
+                print("Enter integer only")
+                print("===================")
             else:
-                print("Enter the Valid choice")
+                if choice == 1:
+                    Display.display_customer_details()
+                elif choice == 2:
+                    Display.display_update_section()
+                elif choice == 3:
+                    Display.display_booking_section()
+                elif choice == 4:
+                    Display.display_customer_booking_history()
+                elif choice == 5:
+                    print("===========================")
+                    print("Thank You!!! Visit Again!!!")
+                    print("===========================")
+                    break
+                else:
+                    print("Enter the Valid choice")
     
+    @classmethod
+    def display_customer_booking_history(self):
+        booking_history = Customer.customer_booking_history()
+        print("--------------------------------------")
+        print("|          BOOKING HISTORY           |")
+        print("--------------------------------------")        
+        if len(booking_history) == 0:
+            print("Since You have No Booking History")
+        else:
+            print("BusName\tSeatType\t\tSeatPlace\tPrice\tDiscountRate\tDate")
+            print("---------------------------------------------------------------------------------")
+            for i in booking_history:
+                print(f"{i[0]}\t{i[1]}||\t\t{i[2]}\t{i[3]}\t{i[4]}\t  {i[5]}")
+            print("----------------------------------------------------------------------------------")
+
+    @classmethod
+    def display_customer_details(self):
+        customer_details = Customer.customers_details()
+        print("--------------------------------------")
+        print("|            YOUR DETAILS            |")
+        print("--------------------------------------")
+        print(f"Name           :{customer_details[0]}")
+        print(f"MobileNo       :{customer_details[1]}")
+        print(f"Email          :{customer_details[2]}")
+        print("--------------------------------------")
+
+    @classmethod
+    def display_update_section(self):
+        print("-----------------------------------")
+        print("|        UPDATE SECTION           |")
+        print("-----------------------------------")
+        print("1.Update Name")
+        print("2.Update Mobile No")
+        print("3.Update Email")
+        print("4.Update LoginPassword")
+        print("5.Go Back")                  
+        try:
+            choice = int(input("Enter your option:"))
+        except ValueError:
+            print("===================")
+            print("Enter integer only")
+            print("===================")
+        else:
+            if choice == 5:
+                Display.display_user_menu()
+            else:
+                Customer.update_customer_details(choice)
+
     @classmethod
     def display_booking_section(self):
         while True:
             print("-----------------------------------")
             print("|        BOOKING SECTION          |")
             print("-----------------------------------")
-            print("1.To View the Seats")
+            print("1.To View Available Seats")
             print("2.To Book the Seats")
             print("3.To View Discount Offers")
             print("4.To View the Booked Seats")
             print("5.Go Back")
-            choice=int(input("Enter Your Choice:"))
-            if choice == 1:
-                Display.display_total_seats()
-            elif choice == 2: 
-                Booking.book_seats()
-            elif choice == 3:
-                Display.display_discount_details()
-            elif choice == 4:
-                Display.display_booked_seats()
-            elif choice == 5:
-                Display.display_user_menu()
+            try:
+                choice = int(input("Enter your option:"))
+            except ValueError:
+                print("===================")
+                print("Enter integer only")
+                print("===================")
             else:
-                print("Enter the valid choice")
+                if choice == 1:
+                    Display.display_available_seats()
+                elif choice == 2: 
+                    Booking.book_seats()
+                elif choice == 3:
+                    Display.display_discount_details()
+                elif choice == 4:
+                    Display.display_booked_seats()
+                elif choice == 5:
+                    Display.display_user_menu()
+                    break
+                else:
+                    print("Enter the valid choice")
 
 Display.display_login_page()
 
