@@ -4,6 +4,7 @@ from datetime import datetime
 con = psycopg2.connect(host='pg-308e5ec7-bus-ticket-booking-system.k.aivencloud.com',database='defaultdb',user='avnadmin',password='AVNS_98y0KvjPTI9Zw5MZieP',port = 21199)
 cur = con.cursor()
 
+
 class Booking:
 
     def Confirm_check(choice):
@@ -99,8 +100,11 @@ class Customer:
         customer_email = str(input("Enter your Email:"))
         customer_login_password = str(input("Enter your Choice of Password to login:"))
         date_joined = datetime.now().strftime('%Y-%m-%d')
-        cur.execute(create_customer_query,(customer_name,customer_mobile_no,customer_email,customer_login_password,date_joined))
-        con.commit()
+        try:
+            cur.execute(create_customer_query,(customer_name,customer_mobile_no,customer_email,customer_login_password,date_joined))
+            con.commit()
+        except psycopg2.errors.UniqueViolation:
+            return None
 
     @classmethod
     def customers_details(self):
@@ -243,10 +247,15 @@ class Display:
                 print("===================")
             else:
                 if choice == 1:
-                    Customer.create_new_cutomer()
-                    print("=================================================")
-                    print("Account Created Successfully!!\nNow you can login")
-                    print("=================================================")
+                    valid_customer = Customer.create_new_cutomer()
+                    if not valid_customer:
+                        print("===================================")
+                        print("You Entered Email or Mobile No is already Exists")
+                        print("===================================")
+                    else:
+                        print("=================================================")
+                        print("Account Created Successfully!!\nNow you can login")
+                        print("=================================================")
                 elif choice == 2:
                     customer_name = Customer.authorize_customer()
                     if customer_name:
