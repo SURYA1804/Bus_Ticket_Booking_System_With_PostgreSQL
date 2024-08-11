@@ -2,7 +2,7 @@
 
 This Python program provides a user interface for a bus ticket booking system. Users can create accounts, login, browse available seats, book seats, view booking history, and update their information.
 
-Features:
+# Features:
 
 User Login and Account Creation
 View Available Seats for Different Buses
@@ -18,11 +18,23 @@ User Interface:
 
 The program starts with a login page. Users can either create a new account or login with existing credentials. After successful login, users are presented with a menu for various functionalities:
 
-View Details: See your name, mobile number, and email address.
-Update Details: Edit your name, mobile number, email address, or password.
+View Details: 
+    See your name 
+    mobile number 
+    email address.
+Update Details: 
+    Edit your name
+    mobile number
+    email address
+    password
 Booking Section:
-View Available Seats: Browse available seats for different buses.
-Book Seats: Choose a bus and seat(s), confirm booking, and view the final bill with discounts.
-View Discount Offers: See available discounts on different bus types and seat categories.
-View Booked Seats: Check your booked seats across all trips.
-Booking History: View a list of your previous bus bookings with details like bus name, seat type, price, discount applied, and booking date.
+ View Available Seats: 
+     Browse available seats for different buses.
+ Book Seats: 
+   Choose a bus and seat(s), confirm booking, and view the final bill with discounts.
+ View Discount Offers: 
+   See available discounts on different bus types and seat categories.
+ View Booked Seats: 
+   Check your booked seats across all trips.
+ Booking History: 
+    View a list of your previous bus bookings with details like bus name, seat type, price, discount applied, and booking date.
