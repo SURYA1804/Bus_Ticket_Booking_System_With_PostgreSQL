@@ -15,26 +15,25 @@ Install Dependencies: You'll need the psycopg2 library to connect to the Postgre
 Database Configuration: Update the connection details in the program code with your PostgreSQL database credentials (host, database name, username, password, and port).
 Run the Program: Execute the Python script (python bus_booking_system.py).
 User Interface:
-
 The program starts with a login page. Users can either create a new account or login with existing credentials. After successful login, users are presented with a menu for various functionalities:
 
-View Details: 
+# View Details:
     See your name 
     mobile number 
     email address.
-Update Details: 
+# Update Details: 
     Edit your name
     mobile number
     email address
     password
-Booking Section:
- View Available Seats: 
+# Booking Section:
+ # View Available Seats: 
      Browse available seats for different buses.
- Book Seats: 
+ # Book Seats: 
    Choose a bus and seat(s), confirm booking, and view the final bill with discounts.
- View Discount Offers: 
+ # View Discount Offers: 
    See available discounts on different bus types and seat categories.
- View Booked Seats: 
+ # View Booked Seats: 
    Check your booked seats across all trips.
- Booking History: 
+ # Booking History: 
     View a list of your previous bus bookings with details like bus name, seat type, price, discount applied, and booking date.
