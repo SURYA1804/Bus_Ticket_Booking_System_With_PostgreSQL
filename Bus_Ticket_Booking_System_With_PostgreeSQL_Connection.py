@@ -4,14 +4,13 @@ from datetime import datetime
 con = psycopg2.connect(host='pg-308e5ec7-bus-ticket-booking-system.k.aivencloud.com',database='defaultdb',user='avnadmin',password='AVNS_98y0KvjPTI9Zw5MZieP',port = 21199)
 cur = con.cursor()
 
-
 class Booking:
 
     def Confirm_check(choice):
-        return choice == 'Y'
+        return choice == 'Y' or 'y'
     
     @classmethod
-    def book_seats(self):
+    def book_seats(self,customer_id):
         insert_query = """insert into public."Booked"("BusId","SeatId","CustomerId") values(%s,%s,%s)"""
         price_query = """select "SeatPrice" from public."Seat" where "BusId" = %s and "SeatId" = %s;"""
         search_query = """select "BusId","SeatId" from public."Seat";"""
@@ -32,12 +31,12 @@ class Booking:
                     Valid_seats = cur.fetchall()
                     if (BusId,SeatId) in Valid_seats:
                         if self.Confirm_check(choice=str(input("Enter Y to confirm:"))):
-                            cur.execute(insert_query,(BusId,SeatId,logged_in_customer_id))
+                            cur.execute(insert_query,(BusId,SeatId,customer_id))
                             con.commit()
                             cur.execute(price_query,(BusId,SeatId))
                             price = cur.fetchone()[0]
                             price = price - price * ( Discount.discount_rate(BusId,SeatId) / 100 )
-                            BookingHistory.Insert_Rows_Into_Booking_History(BusId,SeatId,price,Discount.discount_rate(BusId,SeatId))
+                            BookingHistory.Insert_Rows_Into_Booking_History(BusId,SeatId,price,Discount.discount_rate(BusId,SeatId),customer_id)
                             cart[i] = [BusId,SeatId,price,Discount.discount_rate(BusId,SeatId)]
                             i=i+1
                         else:
@@ -51,10 +50,10 @@ class Booking:
 class BookingHistory:
 
     @classmethod
-    def Insert_Rows_Into_Booking_History(self,BusId,SeatId,Price,DiscountRate):
+    def Insert_Rows_Into_Booking_History(self,BusId,SeatId,Price,DiscountRate,customer_id):
         insert_query = """ insert into public."BookingRecords"("BusId","SeatId","Price","DiscountRate","DateTime","CustomerId")values(%s,%s,%s,%s,%s,%s)  ;"""
         current_date = datetime.now().strftime('%Y-%m-%d %H:%M')
-        cur.execute(insert_query,(BusId,SeatId,Price,DiscountRate,current_date,logged_in_customer_id))
+        cur.execute(insert_query,(BusId,SeatId,Price,DiscountRate,current_date,customer_id))
         con.commit()
 
 
@@ -77,20 +76,16 @@ class Customer:
 
     @classmethod
     def authorize_customer(self):
-       search_query = """ select "CustomerName" from public."Customer" where "CustomerEmail" = %s and "LoginPassword" = %s;  """
-       customer_id_query = """select "CustomerId" from public."Customer" where "CustomerEmail" = %s and "LoginPassword" = %s;"""
+       customer_name_id_query = """ select "CustomerName","CustomerId" from public."Customer" where "CustomerEmail" = %s and "LoginPassword" = %s;  """
        extract_customer_list_query = """ select "CustomerEmail","LoginPassword" from public."Customer";  """
        cur.execute(extract_customer_list_query)
        customer_list = cur.fetchall()
        customer_email = str(input("Enter your Email:"))
        customer_login_password = str(input("Enter your login Password :"))
        if (customer_email,customer_login_password) in customer_list:
-           cur.execute(customer_id_query,(customer_email,customer_login_password))
-           global logged_in_customer_id
-           logged_in_customer_id = cur.fetchone()[0]
-           cur.execute(search_query,(customer_email,customer_login_password))
-           customer_name = cur.fetchone()[0]
-           return customer_name 
+           cur.execute(customer_name_id_query,(customer_email,customer_login_password))
+           customer_name,customer_id = cur.fetchone()
+           return (customer_name,customer_id) 
        
     @classmethod
     def create_new_cutomer(self):
@@ -107,41 +102,41 @@ class Customer:
             return None
 
     @classmethod
-    def customers_details(self):
+    def customers_details(self,customer_id):
         customer_details_query = """ select "CustomerName","CustomerMobileNo","CustomerEmail" from public."Customer" where "CustomerId" = %s;  """
-        cur.execute(customer_details_query,(logged_in_customer_id,))
+        cur.execute(customer_details_query,(customer_id,))
         customer_details = cur.fetchone()
         return customer_details
     
     @classmethod
-    def update_customer_details(self,choice):
+    def update_customer_details(self,choice,customer_id):
         if choice == 1:
             update_name_query = """update public."Customer" set "CustomerName" = %s where "CustomerId" = %s; """
             new_name = str(input("Enter new name to update:"))
-            cur.execute(update_name_query,(new_name,logged_in_customer_id))
+            cur.execute(update_name_query,(new_name,customer_id))
             con.commit()
             print("Updated Successfully!!")
         elif choice == 2:
             update_mobile_no_query = """update public."Customer" set "CustomerMobileNo" = %s where "CustomerId" = %s; """
             new_mobile_no = str(input("Enter new Mobile No to update:"))
-            cur.execute(update_mobile_no_query,(new_mobile_no,logged_in_customer_id))
+            cur.execute(update_mobile_no_query,(new_mobile_no,customer_id))
             con.commit()
             print("Updated Successfully!!")
         elif choice == 3:
             update_email_query = """update public."Customer" set "CustomerEmail" = %s where "CustomerId" = %s; """
             new_email = str(input("Enter new Email  to update:"))
-            cur.execute(update_email_query,(new_email,logged_in_customer_id))
+            cur.execute(update_email_query,(new_email,customer_id))
             con.commit()
             print("Updated Successfully!!")
         elif choice == 4:
             get_old_password = """ select "LoginPassword" from public."Customer" where "CustomerId" = %s; """
             update_login_password_query = """update public."Customer" set "LoginPassword" = %s where "CustomerId" = %s; """
-            cur.execute(get_old_password,(logged_in_customer_id,))
+            cur.execute(get_old_password,(customer_id,))
             old_login_password = cur.fetchone()[0]
             user_enterd_old_login_password = str(input("Enter Old Login Password  to Verify:"))
             if old_login_password == user_enterd_old_login_password:
                 new_login_password = str(input("Enter new Login Password  to update:"))
-                cur.execute(update_login_password_query,(new_login_password,logged_in_customer_id))
+                cur.execute(update_login_password_query,(new_login_password,customer_id))
                 con.commit()
                 print("Updated Successfully!!")
             else:
@@ -150,11 +145,11 @@ class Customer:
             print("Enter a valid Option")
 
     @classmethod
-    def customer_booking_history(self):
+    def customer_booking_history(self,customer_id):
         query_to_get_booking_history_of_customer = """select "Bus"."BusName","s"."SeatType","s"."SeatPlace","b"."Price","b"."DiscountRate","b"."DateTime" from   
                                                      public."BookingRecords" "b" left join public."Bus"  on "Bus"."BusId" = "b"."BusId" left join public."Seat" "s"
                                                     on "b"."SeatId" = "s"."SeatId" and "b"."BusId" = "s"."BusId"  where "b"."CustomerId"=%s;"""
-        cur.execute(query_to_get_booking_history_of_customer,(logged_in_customer_id,))
+        cur.execute(query_to_get_booking_history_of_customer,(customer_id,))
         booking_history = cur.fetchall()
         return booking_history
 
@@ -247,23 +242,24 @@ class Display:
                 print("===================")
             else:
                 if choice == 1:
-                    valid_customer = Customer.create_new_cutomer()
-                    if not valid_customer:
-                        print("===================================")
-                        print("You Entered Email or Mobile No is already Exists")
-                        print("===================================")
-                    else:
+                    if Customer.create_new_cutomer():
                         print("=================================================")
                         print("Account Created Successfully!!\nNow you can login")
                         print("=================================================")
+                    else:
+                        print("===================================")
+                        print("You Entered Email or Mobile No is already Exists")
+                        print("===================================")
+                        
                 elif choice == 2:
-                    customer_name = Customer.authorize_customer()
-                    if customer_name:
+                    customer_details = Customer.authorize_customer()
+                    if customer_details:
+                        customer_name,customer_id = customer_details
                         print("===========================================")
                         print(f"Welcome {customer_name}!!")
                         print(f"You Successfully Logged In")
                         print("===========================================")
-                        Display.display_user_menu()
+                        Display.display_user_menu(customer_id)
                         break
                     else:
                         print("========================================")
@@ -278,7 +274,7 @@ class Display:
                     print("Enter a Valid Choice.")
 
     @classmethod
-    def display_user_menu(self):
+    def display_user_menu(self,customer_id):
         while True:
             print("-----------------------------------")
             print("|          MAIN SECTION           |")
@@ -296,13 +292,13 @@ class Display:
                 print("===================")
             else:
                 if choice == 1:
-                    Display.display_customer_details()
+                    Display.display_customer_details(customer_id)
                 elif choice == 2:
-                    Display.display_update_section()
+                    Display.display_update_section(customer_id)
                 elif choice == 3:
-                    Display.display_booking_section()
+                    Display.display_booking_section(customer_id)
                 elif choice == 4:
-                    Display.display_customer_booking_history()
+                    Display.display_customer_booking_history(customer_id)
                 elif choice == 5:
                     print("===========================")
                     print("Thank You!!! Visit Again!!!")
@@ -312,8 +308,8 @@ class Display:
                     print("Enter the Valid choice")
     
     @classmethod
-    def display_customer_booking_history(self):
-        booking_history = Customer.customer_booking_history()
+    def display_customer_booking_history(self,customer_id):
+        booking_history = Customer.customer_booking_history(customer_id)
         print("--------------------------------------")
         print("|          BOOKING HISTORY           |")
         print("--------------------------------------")        
@@ -321,14 +317,14 @@ class Display:
             print("Since You have No Booking History")
         else:
             print("BusName\tSeatType\t\tSeatPlace\tPrice\tDiscountRate\tDate")
-            print("---------------------------------------------------------------------------------")
+            print("------------------------------------------------------------------------------")
             for i in booking_history:
                 print(f"{i[0]}\t{i[1]}||\t\t{i[2]}\t{i[3]}\t{i[4]}\t  {i[5]}")
-            print("----------------------------------------------------------------------------------")
+            print("------------------------------------------------------------------------------")
 
     @classmethod
-    def display_customer_details(self):
-        customer_details = Customer.customers_details()
+    def display_customer_details(self,customer_id):
+        customer_details = Customer.customers_details(customer_id)
         print("--------------------------------------")
         print("|            YOUR DETAILS            |")
         print("--------------------------------------")
@@ -338,7 +334,7 @@ class Display:
         print("--------------------------------------")
 
     @classmethod
-    def display_update_section(self):
+    def display_update_section(self,customer_id):
         print("-----------------------------------")
         print("|        UPDATE SECTION           |")
         print("-----------------------------------")
@@ -357,10 +353,10 @@ class Display:
             if choice == 5:
                 Display.display_user_menu()
             else:
-                Customer.update_customer_details(choice)
+                Customer.update_customer_details(choice,customer_id)
 
     @classmethod
-    def display_booking_section(self):
+    def display_booking_section(self,customer_id):
         while True:
             print("-----------------------------------")
             print("|        BOOKING SECTION          |")
@@ -380,13 +376,13 @@ class Display:
                 if choice == 1:
                     Display.display_available_seats()
                 elif choice == 2: 
-                    Booking.book_seats()
+                    Booking.book_seats(customer_id)
                 elif choice == 3:
                     Display.display_discount_details()
                 elif choice == 4:
                     Display.display_booked_seats()
                 elif choice == 5:
-                    Display.display_user_menu()
+                    Display.display_user_menu(customer_id)
                     break
                 else:
                     print("Enter the valid choice")
